@@ -1,0 +1,108 @@
+---
+title: "Essential Skills Pipeline"
+---
+erDiagram
+    skill_plan {
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string app "App name"
+        string subject "Subject"
+        string type "essential or supporting"
+        string plan_grade "Grade level"
+        date invalidated_on "Invalidation date"
+    }
+    all_skills_ixl {
+        string skill_id PK "IXL skill ID"
+        string permacode "Permanent code"
+        string app "App (IXL)"
+        string subject "Subject"
+        string grade "Grade"
+    }
+    supporting_skills_map {
+        string essential_skill_id FK "Essential skill ID"
+        string essential_app "App"
+        string essential_subject "Subject"
+        string essential_plan_grade "Grade"
+        string supporting_skill_id PK "Supporting skill ID"
+        string supporting_skill_code "Code"
+    }
+    level_mastery {
+        string id PK "Lesson ID"
+        string external_student_id FK "Student ID"
+        string app "App"
+        string subject "Subject"
+        string resource_type "essential or standard"
+        string status "Lesson status"
+    }
+    daily_learning_metrics {
+        date date PK "Date"
+        string external_student_id FK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int levels_mastered "Levels mastered"
+    }
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+    }
+    mastery_thresholds {
+        string campus_id FK "Campus ID"
+        string app "App"
+        string subject "Subject"
+        string grade "Grade"
+        int target_mastery_units "Daily target"
+    }
+    khiem_v_daily_time {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double daily_minutes "Minutes"
+    }
+    khiem_v_full_skill_plan {
+        string app PK "App"
+        string subject PK "Subject"
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string plan_grade PK "Grade"
+        string type "essential or supporting"
+    }
+    khiem_v_essential_skill_counts {
+        string app PK "App"
+        string subject PK "Subject"
+        string plan_grade PK "Grade text"
+        int total_essential_skills "Total essential skills"
+    }
+    khiem_v_course_essential_totals {
+        string app PK "App"
+        string subject PK "Subject"
+        string course PK "Course"
+        int total_course_essential_levels "Essential levels"
+    }
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK "Full student ID"
+        date activity_date PK "Date"
+        string subject PK "Subject"
+        string app PK "App"
+        int essential_levels_mastered_eng "Levels mastered"
+    }
+    khiem_v_daily_targets {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int daily_mastery_target "Target"
+    }
+
+    skill_plan ||--o{ khiem_v_full_skill_plan : "essential skills"
+    supporting_skills_map ||--o{ khiem_v_full_skill_plan : "supporting skills"
+    all_skills_ixl ||--o{ khiem_v_full_skill_plan : "IXL skill definitions"
+    skill_plan ||--o{ khiem_v_essential_skill_counts : "counted by grade"
+    khiem_v_full_skill_plan ||--o{ khiem_v_course_essential_totals : "essential count per course"
+    level_mastery ||--o{ khiem_v_student_essential_mastery_from_lm : "IXL essential lessons"
+    daily_learning_metrics ||--o{ khiem_v_student_essential_mastery_from_lm : "non-IXL essential"
+    khiem_v_roster ||--o{ khiem_v_student_essential_mastery_from_lm : "identity mapping"
+    mastery_thresholds ||--o{ khiem_v_daily_targets : "target definitions"
+    khiem_v_daily_time ||--o{ khiem_v_daily_targets : "activity context"
+    khiem_v_roster ||--o{ khiem_v_daily_targets : "student grade"
+    daily_learning_metrics ||--o{ khiem_v_daily_time : "aggregated"

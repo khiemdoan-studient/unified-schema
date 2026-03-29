@@ -1,0 +1,88 @@
+---
+title: "Test Scores & Identity Resolution"
+---
+erDiagram
+    edulastic_data {
+        string assignmentid PK "Assignment ID"
+        string userid FK "User ID"
+        string title "Test title"
+        string subject "Subject"
+        double score "Score"
+        double maxscore "Max score"
+        double accuracy "Accuracy pct"
+        date enddate "Completion date"
+        string status "submitted, etc."
+    }
+    test_scores {
+        string id PK "Test score ID"
+        date test_date "Test date"
+        string external_student_id FK "Short student ID"
+        string test_name "Test name"
+        string subject "Subject"
+        double score "Score"
+        double accuracy "Accuracy"
+    }
+    nwea_reports {
+        string studentid FK "Student ID"
+        string subject "Subject"
+        string termname "Term"
+        int testritscore "RIT score"
+        int testpercentile "Percentile"
+    }
+    daily_learning_metrics {
+        string uuid "App UUID"
+        string email "Student email"
+        string external_student_id FK "Short student ID"
+    }
+    alpha_student {
+        string fullid PK "Full student ID"
+        string id "External student ID"
+        string email "Student email"
+        string fullname "Student name"
+    }
+    edulastic_test_inventory {
+        string id PK "Test ID"
+        string title "Test title"
+        string grade "Grade"
+        string subject "Subject"
+    }
+    khiem_identity_bridge {
+        string fullid PK "Full student ID"
+        string external_id_4 "Last 4 of ext ID"
+        string bridge_type "UUID, EMAIL, EXTID, ROSTER"
+        string student_name "Resolved name"
+        string email_norm "Normalized email"
+    }
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK "Full student ID"
+        string subject_lower PK "Subject"
+        int fall_rit "Fall RIT"
+        int winter_rit "Winter RIT"
+        int spring_rit "Spring RIT"
+        int fall_cgp "Fall CGP"
+        int winter_cgp "Winter CGP"
+        int spring_cgp "Spring CGP"
+        string f2w_projected_growth "Projected growth"
+        string f2w_observed_growth "Observed growth"
+    }
+    khiem_v_test_scores_final {
+        string student_id PK "Full student ID"
+        date date PK "Test date"
+        string test_name PK "Test name"
+        string source_system PK "edulastic, coachbot, nwea"
+        string student_name "Student name"
+        string subject "Subject"
+        double score "Score"
+        double max_score "Max score"
+        string pass_fail "Pass or Fail"
+        double accuracy "Accuracy"
+    }
+
+    daily_learning_metrics ||--o{ khiem_identity_bridge : "UUID + email resolution"
+    alpha_student ||--o{ khiem_identity_bridge : "roster fallback"
+    nwea_reports ||--o{ khiem_v_nwea_comprehensive : "pivoted by term"
+    edulastic_data ||--o{ khiem_v_test_scores_final : "Edulastic tests"
+    test_scores ||--o{ khiem_v_test_scores_final : "CoachBot tests"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_test_scores_final : "NWEA/MAP scores"
+    khiem_identity_bridge ||--o{ khiem_v_test_scores_final : "identity resolution"
+    alpha_student ||--o{ khiem_v_test_scores_final : "student lookup"

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studient Unified Schema — Interactive ERD</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            overflow: hidden;
+            height: 100vh;
+        }
+        /* Top toolbar */
+        .toolbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: #161b22; border-bottom: 1px solid #30363d;
+            padding: 8px 16px; display: flex; align-items: center; gap: 12px;
+            height: 48px;
+        }
+        .toolbar h1 {
+            font-size: 15px; font-weight: 600; color: #e6edf3;
+            white-space: nowrap;
+        }
+        .toolbar .sep { width: 1px; height: 24px; background: #30363d; }
+        .toolbar button {
+            background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+            padding: 4px 12px; border-radius: 6px; cursor: pointer;
+            font-size: 13px; transition: background 0.15s;
+        }
+        .toolbar button:hover { background: #30363d; }
+        .toolbar button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+        .toolbar .zoom-info {
+            font-size: 12px; color: #8b949e; margin-left: auto;
+            white-space: nowrap;
+        }
+        .toolbar .legend {
+            display: flex; gap: 12px; margin-left: 12px;
+        }
+        .toolbar .legend-item {
+            display: flex; align-items: center; gap: 4px; font-size: 12px;
+        }
+        .legend-dot {
+            width: 10px; height: 10px; border-radius: 2px; display: inline-block;
+        }
+        /* Diagram container */
+        #diagram-container {
+            position: absolute; top: 48px; left: 0; right: 0; bottom: 0;
+            overflow: hidden; cursor: grab;
+        }
+        #diagram-container:active { cursor: grabbing; }
+        #diagram-container .mermaid {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: none;
+        }
+        /* Help overlay */
+        .help-overlay {
+            position: fixed; bottom: 16px; right: 16px; z-index: 100;
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 12px 16px; font-size: 12px; color: #8b949e;
+            max-width: 260px; line-height: 1.6;
+        }
+        .help-overlay kbd {
+            background: #21262d; border: 1px solid #30363d; border-radius: 3px;
+            padding: 1px 5px; font-family: monospace; color: #c9d1d9; font-size: 11px;
+        }
+        /* Minimap */
+        #minimap {
+            position: fixed; bottom: 16px; left: 16px; z-index: 100;
+            width: 200px; height: 140px;
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            overflow: hidden;
+        }
+        #minimap svg { width: 100%; height: 100%; }
+        #minimap .viewport-rect {
+            fill: rgba(31, 111, 235, 0.15);
+            stroke: #1f6feb; stroke-width: 2;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>Studient Unified Schema — ERD</h1>
+        <div class="sep"></div>
+        <button onclick="setView('full')" class="active" id="btn-full">Full Schema</button>
+        <button onclick="setView('lesson-unified')" id="btn-lesson-unified">Lesson Unified</button>
+        <button onclick="setView('weekly-dashboard')" id="btn-weekly-dashboard">Weekly Dashboard</button>
+        <button onclick="setView('essential-skills')" id="btn-essential-skills">Essential Skills</button>
+        <button onclick="setView('tests')" id="btn-tests">Tests &amp; Scores</button>
+        <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#f0883e"></span> External Table</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#3fb950"></span> Intermediate View</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#1f6feb"></span> Primary Output</span>
+        </div>
+        <div class="zoom-info" id="zoom-info">100% · Scroll to zoom · Drag to pan</div>
+        <button onclick="resetZoom()">Reset View</button>
+        <button onclick="zoomIn()">+</button>
+        <button onclick="zoomOut()">−</button>
+    </div>
+
+    <div id="diagram-container">
+        <div class="mermaid" id="mermaid-target"></div>
+    </div>
+
+    <div class="help-overlay">
+        <strong>Controls</strong><br>
+        <kbd>Scroll</kbd> Zoom in/out<br>
+        <kbd>Click + Drag</kbd> Pan around<br>
+        <kbd>Double-click</kbd> Zoom to fit<br>
+        <kbd>1-5</kbd> Switch views
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            er: {
+                layoutDirection: 'TB',
+                minEntityWidth: 180,
+                minEntityHeight: 30,
+                entityPadding: 15,
+                useMaxWidth: false,
+                fontSize: 14
+            },
+            themeVariables: {
+                primaryColor: '#1f6feb',
+                lineColor: '#58a6ff',
+                textColor: '#c9d1d9'
+            }
+        });
+
+        // ── Diagram definitions by view ──
+        const diagrams = {
+            'full': `erDiagram
+    level_mastery {
+        string id PK
+        date date
+        string external_student_id FK
+        string app
+        string subject
+        string course
+        string level
+        double mastery_percentage
+        double active_minutes
+        string resource_type
+        string status
+    }
+    alpha_student {
+        string fullid PK
+        string id
+        string campusid FK
+        string fullname
+        string gradelevel
+        string email
+        string group
+        string advisoremail
+    }
+    daily_learning_metrics {
+        date date PK
+        string external_student_id FK
+        string subject PK
+        string app PK
+        double active_minutes
+        int levels_mastered
+        string uuid
+    }
+    skill_plan {
+        string skill_id PK
+        string skill_code
+        string app
+        string subject
+        string type
+        string plan_grade
+    }
+    all_skills_ixl {
+        string skill_id PK
+        string permacode
+        string app
+        string subject
+        string grade
+    }
+    supporting_skills_map {
+        string essential_skill_id FK
+        string supporting_skill_id PK
+        string supporting_skill_code
+    }
+    bracketing_assignments {
+        string full_student_id FK
+        string subject
+        int grade
+        date assigned_on
+        string onboarding_status
+    }
+    nwea_reports {
+        string studentid FK
+        string subject
+        string termname
+        int testritscore
+        int testpercentile
+    }
+    edulastic_data {
+        string assignmentid PK
+        string userid FK
+        string title
+        double score
+        double maxscore
+        double accuracy
+    }
+    test_scores {
+        string id PK
+        date test_date
+        string external_student_id FK
+        string test_name
+        double score
+    }
+    mastery_thresholds {
+        string campus_id FK
+        string app
+        string subject
+        string grade
+        int target_mastery_units
+    }
+    edulastic_mastered_skills {
+        string external_student_id FK
+        date date
+        string subject
+        string thirdpartylevelcode
+    }
+    edulastic_test_inventory {
+        string id PK
+        string title
+        string grade
+        string subject
+    }
+    khiem_v_roster {
+        string full_student_id PK
+        string external_student_id UK
+        string campus_id FK
+        string campus_name
+        string student_name
+        string grade
+        string teacher_name
+        string teacher_email
+    }
+    khiem_v_daily_time {
+        date date PK
+        string full_student_id PK
+        string subject PK
+        string app PK
+        double daily_minutes
+        int units_mastered
+    }
+    khiem_identity_bridge {
+        string fullid PK
+        string external_id_4
+        string bridge_type
+        string student_name
+    }
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK
+        string subject_lower PK
+        int fall_rit
+        int winter_rit
+        int spring_rit
+        int fall_cgp
+        int winter_cgp
+        int spring_cgp
+    }
+    khiem_v_bracketing_history_ranges {
+        string full_student_id PK
+        string subject PK
+        int knowledge_grade
+        date valid_from_date PK
+        string onboarding_status
+    }
+    khiem_v_essential_skill_counts {
+        string app PK
+        string subject PK
+        string plan_grade PK
+        int total_essential_skills
+    }
+    khiem_v_full_skill_plan {
+        string app PK
+        string subject PK
+        string skill_id PK
+        string plan_grade PK
+        string type
+    }
+    khiem_v_course_essential_totals {
+        string app PK
+        string subject PK
+        string course PK
+        int total_course_essential_levels
+    }
+    khiem_v_daily_targets {
+        date date PK
+        string full_student_id PK
+        string subject PK
+        string app PK
+        int daily_mastery_target
+    }
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK
+        date activity_date PK
+        string subject PK
+        string app PK
+        int essential_levels_mastered_eng
+    }
+    khiem_v_test_scores_final {
+        string student_id PK
+        date date PK
+        string test_name PK
+        string source_system PK
+        double score
+        string pass_fail
+    }
+    khiem_v_lesson_unified {
+        string row_type PK
+        date activity_date PK
+        string student_id PK
+        string subject PK
+        string app PK
+        string lesson_id PK
+        double minutes_working
+        int levels_mastered
+        string test_result
+        int knowledge_grade
+        string onboarding_status
+    }
+    khiem_v_weekly_dashboard {
+        date week_start PK
+        string student_id PK
+        string school_abbrev
+        int logged_in
+        double total_minutes
+        int days_active
+        int tests_mastered
+        int lessons_mastered
+    }
+    khiem_v_doom_loop_students {
+        string student_id PK
+        string subject PK
+        int knowledge_grade PK
+        string overall_status
+        int total_fail_count
+        date doom_loop_entry_date
+        boolean has_exited
+    }
+
+    alpha_student ||--o{ khiem_v_roster : "dedup"
+    daily_learning_metrics ||--o{ khiem_v_daily_time : "aggregate"
+    nwea_reports ||--o{ khiem_v_nwea_comprehensive : "pivot"
+    bracketing_assignments ||--o{ khiem_v_bracketing_history_ranges : "ranges"
+    skill_plan ||--o{ khiem_v_essential_skill_counts : "count"
+    skill_plan ||--o{ khiem_v_full_skill_plan : "essential"
+    supporting_skills_map ||--o{ khiem_v_full_skill_plan : "supporting"
+    all_skills_ixl ||--o{ khiem_v_full_skill_plan : "ixl"
+    mastery_thresholds ||--o{ khiem_v_daily_targets : "targets"
+    daily_learning_metrics ||--o{ khiem_identity_bridge : "uuid"
+    alpha_student ||--o{ khiem_identity_bridge : "roster"
+    khiem_v_full_skill_plan ||--o{ khiem_v_course_essential_totals : "count"
+    khiem_v_daily_time ||--o{ khiem_v_daily_targets : "context"
+    khiem_v_roster ||--o{ khiem_v_daily_targets : "grade"
+    khiem_v_roster ||--o{ khiem_v_student_essential_mastery_from_lm : "identity"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_test_scores_final : "nwea"
+    khiem_identity_bridge ||--o{ khiem_v_test_scores_final : "identity"
+    edulastic_data ||--o{ khiem_v_test_scores_final : "edulastic"
+    test_scores ||--o{ khiem_v_test_scores_final : "coachbot"
+    alpha_student ||--o{ khiem_v_test_scores_final : "lookup"
+    level_mastery ||--o{ khiem_v_lesson_unified : "lessons"
+    khiem_v_roster ||--o{ khiem_v_lesson_unified : "roster"
+    alpha_student ||--o{ khiem_v_lesson_unified : "advisor"
+    khiem_v_daily_time ||--o{ khiem_v_lesson_unified : "activity"
+    khiem_v_essential_skill_counts ||--o{ khiem_v_lesson_unified : "ixl-grade"
+    khiem_v_bracketing_history_ranges ||--o{ khiem_v_lesson_unified : "bracketing"
+    khiem_v_course_essential_totals ||--o{ khiem_v_lesson_unified : "essentials"
+    khiem_v_daily_targets ||--o{ khiem_v_lesson_unified : "targets"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_lesson_unified : "nwea"
+    khiem_v_student_essential_mastery_from_lm ||--o{ khiem_v_lesson_unified : "mastery"
+    khiem_v_test_scores_final ||--o{ khiem_v_lesson_unified : "tests"
+    edulastic_test_inventory ||--o{ khiem_v_lesson_unified : "test-meta"
+    khiem_v_lesson_unified ||--o{ khiem_v_weekly_dashboard : "weekly"
+    khiem_v_roster ||--o{ khiem_v_weekly_dashboard : "cross-join"
+    alpha_student ||--o{ khiem_v_weekly_dashboard : "advisor"
+    khiem_v_lesson_unified ||--o{ khiem_v_doom_loop_students : "test-events"
+`,
+            'lesson-unified': `erDiagram
+    level_mastery {
+        string id PK "Lesson ID"
+        date date "Lesson date"
+        string external_student_id FK "Short student ID"
+        string app "Learning app"
+        string subject "Subject"
+        string course "Course"
+        string level "Lesson name"
+        double mastery_percentage "Mastery pct"
+        double active_minutes "Active minutes"
+        string resource_type "essential or standard"
+        string status "completed, mastered, passed"
+    }
+    alpha_student {
+        string fullid PK "Full student ID"
+        string campusid FK "Campus ID"
+        string fullname "Student name"
+        string group "Student group"
+        string advisoremail "Advisor email"
+    }
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string student_name "Student name"
+        string grade "Grade"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+    }
+    khiem_v_daily_time {
+        date date PK "Activity date"
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double daily_minutes "Daily minutes"
+    }
+    khiem_v_essential_skill_counts {
+        string app PK "App"
+        string subject PK "Subject"
+        string plan_grade PK "Grade"
+        int total_essential_skills "Total skills"
+    }
+    khiem_v_bracketing_history_ranges {
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        int knowledge_grade "Knowledge grade"
+        date valid_from_date PK "Valid from"
+        string onboarding_status "Status"
+    }
+    khiem_v_course_essential_totals {
+        string app PK "App"
+        string subject PK "Subject"
+        string course PK "Course"
+        int total_course_essential_levels "Essential count"
+    }
+    khiem_v_daily_targets {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int daily_mastery_target "Target"
+    }
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK "Full student ID"
+        string subject_lower PK "Subject"
+        int fall_rit "Fall RIT"
+        int winter_rit "Winter RIT"
+        int spring_rit "Spring RIT"
+    }
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK "Student ID"
+        date activity_date PK "Date"
+        string subject PK "Subject"
+        int essential_levels_mastered_eng "Levels mastered"
+    }
+    khiem_v_test_scores_final {
+        string student_id PK "Student ID"
+        date date PK "Test date"
+        string test_name PK "Test name"
+        string source_system PK "Source"
+        double score "Score"
+        string pass_fail "Pass or Fail"
+    }
+    edulastic_test_inventory {
+        string id PK "Test ID"
+        string title "Test title"
+        string subject "Subject"
+    }
+    khiem_v_lesson_unified {
+        string row_type PK "Lesson, Activity, Test, Bracketing"
+        date activity_date PK "Activity date"
+        string student_id PK "Full student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string subject PK "Subject"
+        string app PK "App"
+        string lesson_id PK "Lesson ID"
+        double minutes_working "Deduped minutes"
+        int levels_mastered "Levels mastered"
+        int essential_units_mastered "Essential mastered"
+        int daily_mastery_target "Daily target"
+        string test_result "Pass or Fail"
+        int knowledge_grade "Knowledge grade"
+        string onboarding_status "Onboarding status"
+        int fall_rit "NWEA Fall RIT"
+    }
+
+    level_mastery ||--o{ khiem_v_lesson_unified : "lesson records"
+    khiem_v_roster ||--o{ khiem_v_lesson_unified : "student enrichment"
+    alpha_student ||--o{ khiem_v_lesson_unified : "advisor + group"
+    khiem_v_daily_time ||--o{ khiem_v_lesson_unified : "unmatched activity"
+    khiem_v_essential_skill_counts ||--o{ khiem_v_lesson_unified : "IXL grade lookup"
+    khiem_v_bracketing_history_ranges ||--o{ khiem_v_lesson_unified : "knowledge grades"
+    khiem_v_course_essential_totals ||--o{ khiem_v_lesson_unified : "essential totals"
+    khiem_v_daily_targets ||--o{ khiem_v_lesson_unified : "mastery targets"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_lesson_unified : "NWEA scores"
+    khiem_v_student_essential_mastery_from_lm ||--o{ khiem_v_lesson_unified : "cumulative mastery"
+    khiem_v_test_scores_final ||--o{ khiem_v_lesson_unified : "test records"
+    edulastic_test_inventory ||--o{ khiem_v_lesson_unified : "test metadata"
+    alpha_student ||--o{ khiem_v_roster : "roster dedup"
+`,
+            'weekly-dashboard': `erDiagram
+    alpha_student {
+        string fullid PK "Full student ID"
+        string campusid FK "Campus ID"
+        string fullname "Student name"
+        string group "Student group"
+        string advisoremail "Advisor email"
+        string level "School level"
+    }
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string student_name "Student name"
+        string grade "Grade"
+        string level "School level"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+    }
+    khiem_v_lesson_unified {
+        string row_type PK "Lesson, Activity, Test, Bracketing"
+        date activity_date PK "Activity date"
+        string student_id PK "Full student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double minutes_working "Deduped minutes"
+        int levels_mastered "Levels mastered"
+        int essential_units_mastered "Essential mastered"
+        string test_result "Pass or Fail"
+        int knowledge_grade "Knowledge grade"
+        string onboarding_status "Onboarding status"
+    }
+    khiem_v_weekly_dashboard {
+        date week_start PK "Monday of week"
+        string week_label "Week of MM-DD-YY"
+        string student_id PK "Full student ID"
+        string student_name "Student name"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string school_abbrev "Short campus name"
+        string school_level "Elem, Middle, High"
+        string grade "Grade"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+        string advisor_email "Advisor email"
+        string student_group "Student group"
+        int logged_in "1 if active"
+        double total_minutes "Total minutes"
+        int days_active "Days active 0-5"
+        int tests_taken "Tests taken"
+        int tests_mastered "Tests passed"
+        int lessons_mastered "Lessons mastered"
+        int essential_lessons_mastered "Essential mastered"
+        int knowledge_grade "Knowledge grade"
+        string primary_subject "Primary subject"
+        string onboarding_status "Onboarding status"
+    }
+    khiem_v_doom_loop_students {
+        string student_id PK "Full student ID"
+        string student_name "Student name"
+        string campus_id FK "Campus ID"
+        string subject PK "Subject"
+        int knowledge_grade PK "Knowledge grade"
+        string teacher_name "Teacher"
+        int total_fail_count "Cumulative failures"
+        date doom_loop_entry_date "Entry date"
+        date doom_loop_exit_date "Exit date"
+        string overall_status "Status"
+        boolean ever_in_doom_loop "Ever in doom loop"
+        boolean has_exited "Has exited"
+    }
+
+    alpha_student ||--o{ khiem_v_roster : "roster dedup"
+    khiem_v_lesson_unified ||--o{ khiem_v_weekly_dashboard : "weekly aggregation"
+    khiem_v_roster ||--o{ khiem_v_weekly_dashboard : "roster CROSS JOIN weeks"
+    alpha_student ||--o{ khiem_v_weekly_dashboard : "advisor info"
+    khiem_v_lesson_unified ||--o{ khiem_v_doom_loop_students : "test events only"
+`,
+            'essential-skills': `erDiagram
+    skill_plan {
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string app "App name"
+        string subject "Subject"
+        string type "essential or supporting"
+        string plan_grade "Grade level"
+        date invalidated_on "Invalidation date"
+    }
+    all_skills_ixl {
+        string skill_id PK "IXL skill ID"
+        string permacode "Permanent code"
+        string app "App (IXL)"
+        string subject "Subject"
+        string grade "Grade"
+    }
+    supporting_skills_map {
+        string essential_skill_id FK "Essential skill ID"
+        string essential_app "App"
+        string essential_subject "Subject"
+        string essential_plan_grade "Grade"
+        string supporting_skill_id PK "Supporting skill ID"
+        string supporting_skill_code "Code"
+    }
+    edulastic_mastered_skills {
+        string external_student_id FK "Short student ID"
+        date date "Mastery date"
+        string subject "Subject"
+        string app "App"
+        string thirdpartylevelcode "Skill code"
+    }
+    level_mastery {
+        string id PK "Lesson ID"
+        string external_student_id FK "Short student ID"
+        string app "App"
+        string subject "Subject"
+        string resource_type "essential or standard"
+        string status "Lesson status"
+    }
+    daily_learning_metrics {
+        date date PK "Date"
+        string external_student_id FK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int levels_mastered "Levels mastered"
+    }
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+        string campus_id FK "Campus ID"
+    }
+    khiem_v_full_skill_plan {
+        string app PK "App"
+        string subject PK "Subject"
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string plan_grade PK "Grade"
+        string type "essential or supporting"
+    }
+    khiem_v_essential_skill_counts {
+        string app PK "App"
+        string subject PK "Subject"
+        string plan_grade PK "Grade text"
+        int total_essential_skills "Total essential skills"
+    }
+    khiem_v_course_essential_totals {
+        string app PK "App"
+        string subject PK "Subject"
+        string course PK "Course"
+        int total_course_essential_levels "Essential levels"
+    }
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK "Full student ID"
+        date activity_date PK "Date"
+        string subject PK "Subject"
+        string app PK "App"
+        int essential_levels_mastered_eng "Levels mastered"
+    }
+    mastery_thresholds {
+        string campus_id FK "Campus ID"
+        string app "App"
+        string subject "Subject"
+        string grade "Grade"
+        int target_mastery_units "Daily target"
+    }
+    khiem_v_daily_time {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double daily_minutes "Minutes"
+    }
+    khiem_v_daily_targets {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int daily_mastery_target "Target"
+    }
+
+    skill_plan ||--o{ khiem_v_full_skill_plan : "essential skills"
+    supporting_skills_map ||--o{ khiem_v_full_skill_plan : "supporting skills"
+    all_skills_ixl ||--o{ khiem_v_full_skill_plan : "IXL skill definitions"
+    skill_plan ||--o{ khiem_v_essential_skill_counts : "counted by grade"
+    khiem_v_full_skill_plan ||--o{ khiem_v_course_essential_totals : "essential count per course"
+    level_mastery ||--o{ khiem_v_student_essential_mastery_from_lm : "IXL essential lessons"
+    daily_learning_metrics ||--o{ khiem_v_student_essential_mastery_from_lm : "non-IXL essential"
+    khiem_v_roster ||--o{ khiem_v_student_essential_mastery_from_lm : "identity mapping"
+    mastery_thresholds ||--o{ khiem_v_daily_targets : "target definitions"
+    khiem_v_daily_time ||--o{ khiem_v_daily_targets : "activity context"
+    khiem_v_roster ||--o{ khiem_v_daily_targets : "student grade"
+    daily_learning_metrics ||--o{ khiem_v_daily_time : "aggregated"
+`,
+            'tests': `erDiagram
+    edulastic_data {
+        string assignmentid PK "Assignment ID"
+        string userid FK "User ID"
+        string title "Test title"
+        string subject "Subject"
+        double score "Score"
+        double maxscore "Max score"
+        double accuracy "Accuracy pct"
+        date enddate "Completion date"
+        string status "submitted, etc."
+    }
+    test_scores {
+        string id PK "Test score ID"
+        date test_date "Test date"
+        string external_student_id FK "Short student ID"
+        string test_name "Test name"
+        string subject "Subject"
+        double score "Score"
+        double accuracy "Accuracy"
+    }
+    nwea_reports {
+        string studentid FK "Student ID"
+        string subject "Subject"
+        string termname "Term"
+        int testritscore "RIT score"
+        int testpercentile "Percentile"
+    }
+    daily_learning_metrics {
+        string uuid "App UUID"
+        string email "Student email"
+        string external_student_id FK "Short student ID"
+    }
+    alpha_student {
+        string fullid PK "Full student ID"
+        string id "External student ID"
+        string email "Student email"
+        string fullname "Student name"
+    }
+    edulastic_test_inventory {
+        string id PK "Test ID"
+        string title "Test title"
+        string grade "Grade"
+        string subject "Subject"
+    }
+    khiem_identity_bridge {
+        string fullid PK "Full student ID"
+        string external_id_4 "Last 4 of ext ID"
+        string bridge_type "UUID, EMAIL, EXTID, ROSTER"
+        string student_name "Resolved name"
+        string email_norm "Normalized email"
+    }
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK "Full student ID"
+        string subject_lower PK "Subject"
+        int fall_rit "Fall RIT"
+        int winter_rit "Winter RIT"
+        int spring_rit "Spring RIT"
+        int fall_cgp "Fall CGP"
+        int winter_cgp "Winter CGP"
+        int spring_cgp "Spring CGP"
+        string f2w_projected_growth "Projected growth"
+        string f2w_observed_growth "Observed growth"
+    }
+    khiem_v_test_scores_final {
+        string student_id PK "Full student ID"
+        date date PK "Test date"
+        string test_name PK "Test name"
+        string source_system PK "edulastic, coachbot, nwea"
+        string student_name "Student name"
+        string subject "Subject"
+        double score "Score"
+        double max_score "Max score"
+        string pass_fail "Pass or Fail"
+        double accuracy "Accuracy"
+    }
+
+    daily_learning_metrics ||--o{ khiem_identity_bridge : "UUID + email resolution"
+    alpha_student ||--o{ khiem_identity_bridge : "roster fallback"
+    nwea_reports ||--o{ khiem_v_nwea_comprehensive : "pivoted by term"
+    edulastic_data ||--o{ khiem_v_test_scores_final : "Edulastic tests"
+    test_scores ||--o{ khiem_v_test_scores_final : "CoachBot tests"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_test_scores_final : "NWEA/MAP scores"
+    khiem_identity_bridge ||--o{ khiem_v_test_scores_final : "identity resolution"
+    alpha_student ||--o{ khiem_v_test_scores_final : "student lookup"
+`
+        };
+
+        // ── Pan/Zoom state ──
+        let scale = 1, panX = 0, panY = 0;
+        let isDragging = false, startX, startY;
+        const container = document.getElementById('diagram-container');
+        const target = document.getElementById('mermaid-target');
+
+        function updateTransform() {
+            target.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+            document.getElementById('zoom-info').textContent =
+                `${Math.round(scale * 100)}% · Scroll to zoom · Drag to pan`;
+        }
+
+        // Mouse wheel zoom
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.max(0.1, Math.min(5, scale * delta));
+            // Zoom towards cursor
+            panX = mouseX - (mouseX - panX) * (newScale / scale);
+            panY = mouseY - (mouseY - panY) * (newScale / scale);
+            scale = newScale;
+            updateTransform();
+        }, { passive: false });
+
+        // Pan with mouse drag
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true; startX = e.clientX - panX; startY = e.clientY - panY;
+        });
+        container.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            panX = e.clientX - startX; panY = e.clientY - startY;
+            updateTransform();
+        });
+        container.addEventListener('mouseup', () => isDragging = false);
+        container.addEventListener('mouseleave', () => isDragging = false);
+
+        // Double-click to fit
+        container.addEventListener('dblclick', () => resetZoom());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '1') setView('full');
+            else if (e.key === '2') setView('lesson-unified');
+            else if (e.key === '3') setView('weekly-dashboard');
+            else if (e.key === '4') setView('essential-skills');
+            else if (e.key === '5') setView('tests');
+            else if (e.key === '+' || e.key === '=') zoomIn();
+            else if (e.key === '-') zoomOut();
+            else if (e.key === '0') resetZoom();
+        });
+
+        function zoomIn() { scale = Math.min(5, scale * 1.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.1, scale * 0.8); updateTransform(); }
+
+        function resetZoom() {
+            const svg = target.querySelector('svg');
+            if (!svg) return;
+            const rect = container.getBoundingClientRect();
+            const svgW = svg.viewBox.baseVal.width || svg.getBoundingClientRect().width;
+            const svgH = svg.viewBox.baseVal.height || svg.getBoundingClientRect().height;
+            scale = Math.min((rect.width - 40) / svgW, (rect.height - 40) / svgH, 1.5);
+            panX = (rect.width - svgW * scale) / 2;
+            panY = (rect.height - svgH * scale) / 2;
+            updateTransform();
+        }
+
+        // ── View switching ──
+        let currentView = 'full';
+
+        async function setView(view) {
+            currentView = view;
+            // Update button states
+            document.querySelectorAll('.toolbar button[id^="btn-"]').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('btn-' + view);
+            if (btn) btn.classList.add('active');
+
+            // Render diagram
+            target.innerHTML = '';
+            const { svg } = await mermaid.render('erd-' + Date.now(), diagrams[view]);
+            target.innerHTML = svg;
+
+            // Fit to view after render
+            setTimeout(resetZoom, 100);
+        }
+
+        // Initial render
+        setView('full');
+    </script>
+</body>
+</html>

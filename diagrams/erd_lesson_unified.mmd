@@ -1,0 +1,124 @@
+---
+title: "khiem_v_lesson_unified — Direct Dependencies"
+---
+erDiagram
+    level_mastery {
+        string id PK "Lesson ID"
+        date date "Lesson date"
+        string external_student_id FK "Short student ID"
+        string app "Learning app"
+        string subject "Subject"
+        string course "Course"
+        string level "Lesson name"
+        double mastery_percentage "Mastery pct"
+        double active_minutes "Active minutes"
+        string resource_type "essential or standard"
+        string status "completed, mastered, passed"
+    }
+    alpha_student {
+        string fullid PK "Full student ID"
+        string campusid FK "Campus ID"
+        string fullname "Student name"
+        string group "Student group"
+        string advisoremail "Advisor email"
+    }
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string student_name "Student name"
+        string grade "Grade"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+    }
+    khiem_v_daily_time {
+        date date PK "Activity date"
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double daily_minutes "Daily minutes"
+    }
+    khiem_v_essential_skill_counts {
+        string app PK "App"
+        string subject PK "Subject"
+        string plan_grade PK "Grade"
+        int total_essential_skills "Total skills"
+    }
+    khiem_v_bracketing_history_ranges {
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        int knowledge_grade "Knowledge grade"
+        date valid_from_date PK "Valid from"
+        string onboarding_status "Status"
+    }
+    khiem_v_course_essential_totals {
+        string app PK "App"
+        string subject PK "Subject"
+        string course PK "Course"
+        int total_course_essential_levels "Essential count"
+    }
+    khiem_v_daily_targets {
+        date date PK "Date"
+        string full_student_id PK "Student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int daily_mastery_target "Target"
+    }
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK "Full student ID"
+        string subject_lower PK "Subject"
+        int fall_rit "Fall RIT"
+        int winter_rit "Winter RIT"
+        int spring_rit "Spring RIT"
+    }
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK "Student ID"
+        date activity_date PK "Date"
+        string subject PK "Subject"
+        int essential_levels_mastered_eng "Levels mastered"
+    }
+    khiem_v_test_scores_final {
+        string student_id PK "Student ID"
+        date date PK "Test date"
+        string test_name PK "Test name"
+        string source_system PK "Source"
+        double score "Score"
+        string pass_fail "Pass or Fail"
+    }
+    edulastic_test_inventory {
+        string id PK "Test ID"
+        string title "Test title"
+        string subject "Subject"
+    }
+    khiem_v_lesson_unified {
+        string row_type PK "Lesson, Activity, Test, Bracketing"
+        date activity_date PK "Activity date"
+        string student_id PK "Full student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string subject PK "Subject"
+        string app PK "App"
+        string lesson_id PK "Lesson ID"
+        double minutes_working "Deduped minutes"
+        int levels_mastered "Levels mastered"
+        int essential_units_mastered "Essential mastered"
+        int daily_mastery_target "Daily target"
+        string test_result "Pass or Fail"
+        int knowledge_grade "Knowledge grade"
+        string onboarding_status "Onboarding status"
+    }
+
+    level_mastery ||--o{ khiem_v_lesson_unified : "lesson records"
+    khiem_v_roster ||--o{ khiem_v_lesson_unified : "student enrichment"
+    alpha_student ||--o{ khiem_v_lesson_unified : "advisor + group"
+    khiem_v_daily_time ||--o{ khiem_v_lesson_unified : "unmatched activity"
+    khiem_v_essential_skill_counts ||--o{ khiem_v_lesson_unified : "IXL grade lookup"
+    khiem_v_bracketing_history_ranges ||--o{ khiem_v_lesson_unified : "knowledge grades"
+    khiem_v_course_essential_totals ||--o{ khiem_v_lesson_unified : "essential totals"
+    khiem_v_daily_targets ||--o{ khiem_v_lesson_unified : "mastery targets"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_lesson_unified : "NWEA scores"
+    khiem_v_student_essential_mastery_from_lm ||--o{ khiem_v_lesson_unified : "cumulative mastery"
+    khiem_v_test_scores_final ||--o{ khiem_v_lesson_unified : "test records"
+    edulastic_test_inventory ||--o{ khiem_v_lesson_unified : "test metadata"
+    alpha_student ||--o{ khiem_v_roster : "roster dedup"
