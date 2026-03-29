@@ -1,0 +1,13 @@
+# Temporary files
+all_ddls.txt
+split_ddls.py
+*.pyc
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

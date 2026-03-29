@@ -1,0 +1,397 @@
+---
+title: "Studient Unified Schema — Entity Relationship Diagram"
+---
+erDiagram
+
+    %% ===== EXTERNAL TABLES (data sources) =====
+
+    level_mastery {
+        string id PK "Lesson ID"
+        date date "Lesson date"
+        string external_student_id FK "Short student ID"
+        string student "Student name from app"
+        string app "Learning app (IXL, Edulastic, etc.)"
+        string subject "Subject"
+        string course "Course name"
+        string level "Level/lesson name"
+        string topic "Topic"
+        double mastery_percentage "Mastery %"
+        int activity_units_attempted "Units attempted"
+        int activity_units_correct "Units correct"
+        double active_minutes "Active minutes"
+        double app_reported_time_minutes "App-reported time"
+        string url "Lesson URL"
+        string resource_type "essential or standard"
+        string status "completed, mastered, passed, etc."
+        timestamp mastered_at "Mastery timestamp"
+    }
+
+    alpha_student {
+        string fullid PK "Full student ID (campus-ext)"
+        string id "External student ID (short)"
+        string campusid FK "Campus ID"
+        string fullname "Student full name"
+        string gradelevel "Grade level"
+        string email "Student email"
+        string campus "Campus name"
+        string group "Student group"
+        string advisor "Advisor name"
+        string advisoremail "Advisor email"
+        string level "School level"
+    }
+
+    daily_learning_metrics {
+        date date PK "Activity date"
+        string campus_id FK "Campus ID"
+        string external_student_id FK "Short student ID"
+        string subject PK "Subject"
+        string app PK "App name"
+        double active_minutes "Active minutes"
+        int levels_mastered "Levels mastered"
+        int correct_questions "Correct answers"
+        int total_questions "Total questions"
+        string email "Student email"
+        string student "Student name"
+        string uuid "App UUID"
+    }
+
+    skill_plan {
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string app FK "App name"
+        string subject "Subject"
+        string type "essential or supporting"
+        string plan_grade "Grade level text"
+        string source "Source system"
+        date invalidated_on "Invalidation date"
+    }
+
+    all_skills_ixl {
+        string skill_id PK "IXL skill ID"
+        string permacode "Permanent code"
+        string app FK "App (IXL)"
+        string subject "Subject"
+        string grade "Grade"
+    }
+
+    supporting_skills_map {
+        string essential_skill_id FK "Essential skill ID"
+        string essential_app "Essential app"
+        string essential_subject "Essential subject"
+        string essential_plan_grade "Essential grade"
+        string supporting_skill_id PK "Supporting skill ID"
+        string supporting_skill_code "Supporting code"
+        date invalidated_on "Invalidation date"
+    }
+
+    bracketing_assignments {
+        string full_student_id FK "Full student ID"
+        string subject "Subject"
+        int grade "Knowledge grade"
+        date assigned_on "Assignment date"
+        date invalidated_on "Invalidation date"
+        string onboarding_status "ROSTERED, BRACKETING, ONBOARDED"
+    }
+
+    nwea_reports {
+        string studentid FK "Student ID"
+        string subject "Subject"
+        string termname "Term (Fall, Winter, Spring)"
+        int testritscore "RIT score"
+        int testpercentile "Percentile"
+        string falltowinterprojectedgrowth "Projected growth"
+        string falltowinterobservedgrowth "Observed growth"
+    }
+
+    edulastic_data {
+        string assignmentid PK "Assignment ID"
+        string userid FK "User ID"
+        string title "Test title"
+        string subject "Subject"
+        double score "Score"
+        double maxscore "Max score"
+        double accuracy "Accuracy %"
+        date enddate "Completion date"
+        string status "submitted, etc."
+    }
+
+    test_scores {
+        string id PK "Test score ID"
+        date test_date "Test date"
+        string external_student_id FK "Short student ID"
+        string test_name "Test name"
+        string subject "Subject"
+        double score "Score"
+        double accuracy "Accuracy"
+        double test_duration_minutes "Duration"
+    }
+
+    mastery_thresholds {
+        string campus_id FK "Campus ID"
+        string app "App"
+        string subject "Subject"
+        string grade "Grade"
+        int target_mastery_units "Daily target"
+    }
+
+    edulastic_mastered_skills {
+        string external_student_id FK "Short student ID"
+        date date "Mastery date"
+        string subject "Subject"
+        string app "App"
+        string thirdpartylevelcode "Skill code"
+        string third_party_level_id "Skill ID"
+    }
+
+    edulastic_test_inventory {
+        string id PK "Test ID"
+        string title "Test title"
+        string grade "Grade"
+        string subject "Subject"
+    }
+
+    %% ===== INTERMEDIATE VIEWS =====
+
+    khiem_v_roster {
+        string full_student_id PK "Full student ID"
+        string external_student_id UK "Short student ID"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string student_name "Student name"
+        string grade "Grade level"
+        string level "School level"
+        string teacher_name "Teacher name"
+        string teacher_email "Teacher email"
+    }
+
+    khiem_v_daily_time {
+        date date PK "Activity date"
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        double daily_minutes "Total daily minutes"
+        int units_mastered "Units mastered"
+        double accuracy "Accuracy %"
+        string course "Course"
+    }
+
+    khiem_identity_bridge {
+        string fullid PK "Full student ID"
+        string external_id_4 "Last 4 of external ID"
+        string bridge_type "UUID, EMAIL, EXTID, ROSTER"
+        string student_name "Resolved name"
+        string email_norm "Normalized email"
+    }
+
+    khiem_v_nwea_comprehensive {
+        string full_student_id PK "Full student ID"
+        string subject_lower PK "Subject (lowercase)"
+        int fall_rit "Fall RIT score"
+        int winter_rit "Winter RIT score"
+        int spring_rit "Spring RIT score"
+        int fall_cgp "Fall CGP"
+        int winter_cgp "Winter CGP"
+        int spring_cgp "Spring CGP"
+        string f2w_projected_growth "Fall-Winter projected"
+        string f2w_observed_growth "Fall-Winter observed"
+    }
+
+    khiem_v_bracketing_history_ranges {
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        int knowledge_grade "Knowledge grade"
+        date valid_from_date PK "Range start"
+        date valid_to_date "Range end"
+        string onboarding_status "Status"
+    }
+
+    khiem_v_essential_skill_counts {
+        string app PK "App"
+        string subject PK "Subject"
+        string plan_grade PK "Grade text"
+        int total_essential_skills "Total essential skills"
+    }
+
+    khiem_v_full_skill_plan {
+        string app PK "App"
+        string subject PK "Subject"
+        string skill_id PK "Skill ID"
+        string skill_code "Skill code"
+        string plan_grade PK "Grade"
+        string type "essential or supporting"
+    }
+
+    khiem_v_course_essential_totals {
+        string app PK "App"
+        string subject PK "Subject"
+        string course PK "Course"
+        int total_course_essential_levels "Essential levels count"
+    }
+
+    khiem_v_daily_targets {
+        date date PK "Activity date"
+        string full_student_id PK "Full student ID"
+        string subject PK "Subject"
+        string app PK "App"
+        int daily_mastery_target "Daily target"
+    }
+
+    khiem_v_student_essential_mastery_from_lm {
+        string student_id PK "Full student ID"
+        date activity_date PK "Date"
+        string subject PK "Subject"
+        string app PK "App"
+        int essential_levels_mastered_eng "Essential levels mastered"
+    }
+
+    khiem_v_test_scores_final {
+        string student_id PK "Full student ID"
+        date date PK "Test date"
+        string test_name PK "Test name"
+        string source_system PK "edulastic, coachbot, nwea"
+        string student_name "Student name"
+        string subject "Subject"
+        double score "Score"
+        double max_score "Max score"
+        string pass_fail "Pass or Fail"
+        double accuracy "Accuracy"
+    }
+
+    %% ===== PRIMARY OUTPUT VIEWS =====
+
+    khiem_v_lesson_unified {
+        string row_type PK "Lesson, Activity, Test, Bracketing Assignment"
+        boolean is_test "Is test record"
+        date activity_date PK "Activity date"
+        string student_id PK "Full student ID"
+        string student_name "Student name"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string school_name "School/group name"
+        string student_group "Student group"
+        string grade "Grade"
+        string level "School level"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+        string advisor_email "Advisor email"
+        string subject_display "Subject (display)"
+        string subject PK "Subject"
+        string app PK "App"
+        string course "Course"
+        double minutes_raw "Raw minutes"
+        double minutes_working "Deduped minutes"
+        int units_mastered "Units mastered"
+        int correct_questions "Correct"
+        int total_questions "Total"
+        double accuracy "Accuracy"
+        int levels_mastered "Levels mastered"
+        int essential_units_attempted "Essential attempted"
+        int essential_units_mastered "Essential mastered"
+        int daily_mastery_target "Daily target"
+        double mastery_vs_daily_target_pct "Target %"
+        string target_status "On Target, Below, Above"
+        string lesson_name "Lesson name"
+        string lesson_id PK "Lesson ID"
+        string test_source "Test source system"
+        string test_name "Test name"
+        string test_type "Test type"
+        double test_score "Test score"
+        double test_accuracy "Test accuracy"
+        string test_result "Pass or Fail"
+        int fall_rit "NWEA Fall RIT"
+        int winter_rit "NWEA Winter RIT"
+        int spring_rit "NWEA Spring RIT"
+        string onboarding_status "Onboarding status"
+        int knowledge_grade "Knowledge grade"
+    }
+
+    khiem_v_weekly_dashboard {
+        date week_start PK "Monday of week"
+        string week_label "Week of MM-DD-YY"
+        string student_id PK "Full student ID"
+        string student_name "Student name"
+        string campus_id FK "Campus ID"
+        string campus_name "Campus name"
+        string school_abbrev "Short campus name"
+        string school_level "Elem, Middle, High"
+        string grade "Grade"
+        string teacher_name "Teacher"
+        string teacher_email "Teacher email"
+        string advisor_email "Advisor email"
+        string student_group "Student group"
+        int logged_in "1 if active, 0 if not"
+        double total_minutes "Total minutes"
+        int days_active "Days active (0-5)"
+        int tests_taken "Tests taken"
+        int tests_mastered "Tests passed"
+        int lessons_mastered "Lessons mastered"
+        int essential_lessons_mastered "Essential mastered"
+        int knowledge_grade "Knowledge grade"
+        string primary_subject "Primary subject"
+        string onboarding_status "Onboarding status"
+        int is_bracketing "1 if bracketing"
+        int is_onboarded "1 if onboarded"
+        int is_rostered "1 if rostered"
+        int is_not_started "1 if not started"
+    }
+
+    khiem_v_doom_loop_students {
+        string student_id PK "Full student ID"
+        string student_name "Student name"
+        string campus_id FK "Campus ID"
+        string subject PK "Subject"
+        int knowledge_grade PK "Knowledge grade"
+        string teacher_name "Teacher"
+        date doom_loop_entry_date "Date entered doom loop"
+        date doom_loop_exit_date "Date exited (null if stuck)"
+        string overall_status "Entered Doom Loop, At Risk, Monitoring"
+        boolean ever_in_doom_loop "Has been in doom loop"
+        boolean has_exited "Has exited doom loop"
+        int total_fail_count "Cumulative failures"
+    }
+
+    %% ===== RELATIONSHIPS =====
+
+    %% External table → View relationships
+    alpha_student ||--o{ khiem_v_roster : "fullid → roster dedup"
+    daily_learning_metrics ||--o{ khiem_v_daily_time : "aggregated by date/student/subject/app"
+    nwea_reports ||--o{ khiem_v_nwea_comprehensive : "pivoted by term"
+    bracketing_assignments ||--o{ khiem_v_bracketing_history_ranges : "date ranges computed"
+    skill_plan ||--o{ khiem_v_essential_skill_counts : "counted by grade"
+    skill_plan ||--o{ khiem_v_full_skill_plan : "essential skills"
+    supporting_skills_map ||--o{ khiem_v_full_skill_plan : "supporting skills"
+    all_skills_ixl ||--o{ khiem_v_full_skill_plan : "IXL skill defs"
+    mastery_thresholds ||--o{ khiem_v_daily_targets : "target definitions"
+    daily_learning_metrics ||--o{ khiem_identity_bridge : "UUID/email resolution"
+    alpha_student ||--o{ khiem_identity_bridge : "roster fallback"
+
+    %% View → View relationships
+    khiem_v_full_skill_plan ||--o{ khiem_v_course_essential_totals : "essential count per course"
+    khiem_v_daily_time ||--o{ khiem_v_daily_targets : "activity context"
+    khiem_v_roster ||--o{ khiem_v_daily_targets : "student grade"
+    khiem_v_roster ||--o{ khiem_v_student_essential_mastery_from_lm : "identity mapping"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_test_scores_final : "NWEA test scores"
+    khiem_identity_bridge ||--o{ khiem_v_test_scores_final : "identity resolution"
+    edulastic_data ||--o{ khiem_v_test_scores_final : "Edulastic tests"
+    test_scores ||--o{ khiem_v_test_scores_final : "CoachBot tests"
+    alpha_student ||--o{ khiem_v_test_scores_final : "student lookup"
+
+    %% Into khiem_v_lesson_unified
+    level_mastery ||--o{ khiem_v_lesson_unified : "lesson records"
+    khiem_v_roster ||--o{ khiem_v_lesson_unified : "student enrichment"
+    alpha_student ||--o{ khiem_v_lesson_unified : "advisor/group"
+    khiem_v_daily_time ||--o{ khiem_v_lesson_unified : "unmatched activity"
+    khiem_v_essential_skill_counts ||--o{ khiem_v_lesson_unified : "IXL grade lookup"
+    khiem_v_bracketing_history_ranges ||--o{ khiem_v_lesson_unified : "knowledge grades"
+    khiem_v_course_essential_totals ||--o{ khiem_v_lesson_unified : "essential totals"
+    khiem_v_daily_targets ||--o{ khiem_v_lesson_unified : "mastery targets"
+    khiem_v_nwea_comprehensive ||--o{ khiem_v_lesson_unified : "NWEA scores"
+    khiem_v_student_essential_mastery_from_lm ||--o{ khiem_v_lesson_unified : "cumulative mastery"
+    khiem_v_test_scores_final ||--o{ khiem_v_lesson_unified : "test records"
+    edulastic_test_inventory ||--o{ khiem_v_lesson_unified : "test metadata"
+
+    %% Into weekly dashboard & doom loop
+    khiem_v_lesson_unified ||--o{ khiem_v_weekly_dashboard : "weekly aggregation"
+    khiem_v_roster ||--o{ khiem_v_weekly_dashboard : "roster cross join"
+    alpha_student ||--o{ khiem_v_weekly_dashboard : "advisor info"
+    khiem_v_lesson_unified ||--o{ khiem_v_doom_loop_students : "test events only"
