@@ -2,6 +2,23 @@
 
 All notable changes to the Studient Athena schema documentation.
 
+## [v1.1.0] — 2026-04-10
+
+### Added
+- **`externalstudentid` column** — State/district student ID from upstream data feed
+  - Added to `alpha_student` external table DDL (3 new columns: `is_test`, `admission_date`, `externalstudentid`)
+  - Propagated through `khiem_v_roster` → `khiem_v_lesson_unified` → `khiem_v_weekly_dashboard`
+  - Available in all 4 UNION ALL branches of `khiem_v_lesson_unified` (Lesson, Activity, Test, Bracketing Assignment)
+- **Migration script** — `migration/001_add_externalstudentid.sql` with step-by-step Athena DDL commands
+
+### Changed
+- `ddl/tables/alpha_student.sql` — 24 → 27 columns (matches upstream `dash-data.alpha_student` on RAPIDAPI account)
+- `ddl/views/khiem_v_roster.sql` — added `externalstudentid` output column
+- `ddl/views/khiem_v_lesson_unified.sql` — added `externalstudentid` to all row types
+- `ddl/views/khiem_v_weekly_dashboard.sql` — added `externalstudentid` to `sc_roster` CTE and final output
+
+---
+
 ## [v1.0.0] — 2026-03-29
 
 ### Added
