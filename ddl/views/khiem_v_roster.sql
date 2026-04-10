@@ -1,5 +1,6 @@
 -- VIEW: studient.khiem_v_roster
 -- Extracted from AWS Athena on 2026-03-29
+-- Updated 2026-04-10: Added externalstudentid (state/district student ID)
 
 CREATE VIEW studient.khiem_v_roster AS
 SELECT
@@ -15,5 +16,6 @@ SELECT
 , s.admissionstatus status
 , s.email student_email
 , s.advisoremail teacher_email
+, s.externalstudentid
 FROM
   studient.alpha_student s

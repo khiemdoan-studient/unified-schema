@@ -1,5 +1,6 @@
 -- VIEW: studient.khiem_v_weekly_dashboard
 -- Extracted from AWS Athena on 2026-03-29
+-- Updated 2026-04-10: Added externalstudentid (state/district student ID)
 
 CREATE VIEW studient.khiem_v_weekly_dashboard AS
 WITH
@@ -16,6 +17,7 @@ WITH
    , COALESCE(ast.advisoremail, r.teacher_email) teacher_email
    , ast.advisoremail advisor_email
    , ast."group" student_group
+   , r.externalstudentid
    FROM
      (studient.khiem_v_roster r
    LEFT JOIN studient.alpha_student ast ON (r.full_student_id = ast.fullid))
@@ -61,6 +63,7 @@ SELECT
 , r.teacher_email
 , r.advisor_email
 , r.student_group
+, r.externalstudentid
 , COALESCE(a.had_activity, 0) logged_in
 , COALESCE(a.total_minutes, 0) total_minutes
 , COALESCE(a.days_active, 0) days_active
