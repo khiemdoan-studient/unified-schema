@@ -1,5 +1,6 @@
 -- VIEW: studient.khiem_v_lesson_unified
 -- Extracted from AWS Athena on 2026-03-29
+-- Updated 2026-04-10: Added externalstudentid (state/district student ID)
 
 CREATE VIEW studient.khiem_v_lesson_unified AS
 WITH
@@ -73,6 +74,7 @@ WITH
    , r.teacher_email
    , ast.advisoremail advisor_email
    , r.student_name
+   , r.externalstudentid
    , ROW_NUMBER() OVER (PARTITION BY lb.lesson_id ORDER BY r.campus_id ASC) roster_dedup
    FROM
      ((lesson_base lb
@@ -117,6 +119,7 @@ FROM
    , r.teacher_name
    , r.teacher_email
    , ast.advisoremail advisor_email
+   , r.externalstudentid
    FROM
      (((studient.khiem_v_daily_time dt
    INNER JOIN studient.khiem_v_roster r ON (dt.full_student_id = r.full_student_id))
@@ -191,6 +194,7 @@ FROM
    , lf.teacher_name
    , lf.teacher_email
    , lf.advisor_email
+   , lf.externalstudentid
    , lf.subject_display
    , lf.subject
    , lf.app
@@ -278,6 +282,7 @@ UNION ALL    SELECT
    , au.teacher_name
    , au.teacher_email
    , au.advisor_email
+   , au.externalstudentid
    , au.subject_display
    , au.subject
    , au.app
@@ -361,6 +366,7 @@ UNION ALL    SELECT
    , r.teacher_name
    , r.teacher_email
    , ast.advisoremail advisor_email
+   , r.externalstudentid
    , CONCAT(UPPER(SUBSTR(trim(BOTH FROM ts.subject), 1, 1)), LOWER(SUBSTR(trim(BOTH FROM ts.subject), 2))) subject_display
    , (CASE WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'reading') THEN 'Reading' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'language') THEN 'Language' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'math') THEN 'Math' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'science') THEN 'Science' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'social studies') THEN 'Social Studies' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'writing') THEN 'Writing' WHEN (LOWER(trim(BOTH FROM ts.subject)) = 'fast math') THEN 'Fast Math' ELSE CONCAT(UPPER(SUBSTR(trim(BOTH FROM ts.subject), 1, 1)), LOWER(SUBSTR(trim(BOTH FROM ts.subject), 2))) END) subject
    , CAST(null AS VARCHAR) app
@@ -452,6 +458,7 @@ UNION ALL    SELECT
    , r.teacher_name
    , r.teacher_email
    , ast.advisoremail advisor_email
+   , r.externalstudentid
    , CONCAT(UPPER(SUBSTR(trim(BOTH FROM ba.subject), 1, 1)), LOWER(SUBSTR(trim(BOTH FROM ba.subject), 2))) subject_display
    , (CASE WHEN (LOWER(trim(BOTH FROM ba.subject)) = 'reading') THEN 'Reading' WHEN (LOWER(trim(BOTH FROM ba.subject)) = 'language') THEN 'Language' WHEN (LOWER(trim(BOTH FROM ba.subject)) = 'math') THEN 'Math' ELSE CONCAT(UPPER(SUBSTR(trim(BOTH FROM ba.subject), 1, 1)), LOWER(SUBSTR(trim(BOTH FROM ba.subject), 2))) END) subject
    , CAST(null AS VARCHAR) app
