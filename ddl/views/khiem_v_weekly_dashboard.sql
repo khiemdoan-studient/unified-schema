@@ -1,9 +1,22 @@
 -- VIEW: studient.khiem_v_weekly_dashboard
 -- Extracted from AWS Athena on 2026-03-29
 
-CREATE VIEW studient.khiem_v_weekly_dashboard AS
+CREATE OR REPLACE VIEW studient.khiem_v_weekly_dashboard AS
 WITH
-  sc_roster AS (
+  alpha_student_dedup AS (
+   -- Dedup alpha_student: 1 row per student, prefer row with group populated
+   SELECT fullid, "group" AS student_group, advisoremail
+   FROM (
+     SELECT fullid, "group", advisoremail,
+       ROW_NUMBER() OVER (PARTITION BY fullid
+         ORDER BY CASE WHEN "group" IS NOT NULL AND "group" <> '' THEN 0 ELSE 1 END ASC
+       ) rn
+     FROM studient.alpha_student
+     WHERE admissionstatus = 'Enrolled'
+   )
+   WHERE rn = 1
+)
+, sc_roster AS (
    SELECT DISTINCT
      r.full_student_id student_id
    , r.student_name
@@ -15,10 +28,10 @@ WITH
    , r.teacher_name
    , COALESCE(ast.advisoremail, r.teacher_email) teacher_email
    , ast.advisoremail advisor_email
-   , ast."group" student_group
+   , ast.student_group
    FROM
      (studient.khiem_v_roster r
-   LEFT JOIN studient.alpha_student ast ON (r.full_student_id = ast.fullid))
+   LEFT JOIN alpha_student_dedup ast ON (r.full_student_id = ast.fullid))
 ) 
 , weeks AS (
    SELECT DISTINCT

@@ -1,7 +1,7 @@
 -- VIEW: studient.khiem_v_lesson_unified
 -- Extracted from AWS Athena on 2026-03-29
 
-CREATE VIEW studient.khiem_v_lesson_unified AS
+CREATE OR REPLACE VIEW studient.khiem_v_lesson_unified AS
 WITH
   target_campuses AS (
    SELECT campus_id
@@ -21,7 +21,33 @@ WITH
       , '087'
       , '088'
    )  t (campus_id)
-) 
+)
+, alpha_student_dedup AS (
+   -- Dedup alpha_student: 1 row per student, prefer row with group populated (most recent assignment)
+   SELECT fullid, student_group, advisoremail
+   FROM (
+     SELECT fullid, "group" AS student_group, advisoremail,
+       ROW_NUMBER() OVER (PARTITION BY fullid
+         ORDER BY CASE WHEN "group" IS NOT NULL AND "group" <> '' THEN 0 ELSE 1 END ASC
+       ) rn
+     FROM studient.alpha_student
+     WHERE admissionstatus = 'Enrolled'
+   )
+   WHERE rn = 1
+)
+, first_real_placement AS (
+   -- First ONBOARDED/ROSTERED entry where KGs were assigned (not initial placement).
+   -- Notes containing "Assigning" indicate real placement with learning gaps.
+   -- Initial placement notes say "First X test" or "Reassigning grade lowest grade".
+   -- Passes on or after this date count as grade levels mastered.
+   SELECT full_student_id, LOWER(trim(BOTH FROM subject)) AS subject,
+     MIN(TRY(CAST(from_iso8601_timestamp(assigned_on) AS DATE))) AS first_placed
+   FROM studient.bracketing_assignments
+   WHERE onboarding_status IN ('ONBOARDED', 'ROSTERED')
+     AND notes LIKE '%Assigning%KG%'
+     AND assigned_on IS NOT NULL
+   GROUP BY 1, 2
+)
 , ixl_grade_lookup AS (
    SELECT
      app
@@ -65,8 +91,8 @@ WITH
    , r.full_student_id
    , r.campus_id
    , r.campus_name
-   , COALESCE(ast."group", r.campus_name) school_name
-   , ast."group" student_group
+   , COALESCE(ast.student_group, r.campus_name) school_name
+   , ast.student_group
    , r.grade
    , r.level student_level
    , r.teacher_name
@@ -77,7 +103,7 @@ WITH
    FROM
      ((lesson_base lb
    INNER JOIN studient.khiem_v_roster r ON (lb.external_student_id = r.external_student_id))
-   LEFT JOIN studient.alpha_student ast ON (r.full_student_id = ast.fullid))
+   LEFT JOIN alpha_student_dedup ast ON (r.full_student_id = ast.fullid))
    WHERE (r.campus_id IN (SELECT campus_id
 FROM
   target_campuses
@@ -110,8 +136,8 @@ FROM
    , r.student_name
    , r.campus_id
    , r.campus_name
-   , COALESCE(ast."group", r.campus_name) school_name
-   , ast."group" student_group
+   , COALESCE(ast.student_group, r.campus_name) school_name
+   , ast.student_group
    , r.grade
    , r.level student_level
    , r.teacher_name
@@ -120,7 +146,7 @@ FROM
    FROM
      (((studient.khiem_v_daily_time dt
    INNER JOIN studient.khiem_v_roster r ON (dt.full_student_id = r.full_student_id))
-   LEFT JOIN studient.alpha_student ast ON (r.full_student_id = ast.fullid))
+   LEFT JOIN alpha_student_dedup ast ON (r.full_student_id = ast.fullid))
    LEFT JOIN lesson_final lf ON ((dt.full_student_id = lf.full_student_id) AND (dt.date = lf.lesson_date) AND (LOWER(trim(BOTH FROM dt.subject)) = LOWER(lf.subject)) AND (LOWER(dt.app) = LOWER(lf.app))))
    WHERE ((dt.date >= DATE '2025-01-01') AND (r.campus_id IN (SELECT campus_id
 FROM
@@ -256,7 +282,7 @@ FROM
      (((((((((lesson_final lf
    LEFT JOIN targets_map t ON ((lf.full_student_id = t.full_student_id) AND (lf.lesson_date = t.date) AND (LOWER(lf.subject) = LOWER(t.subject)) AND (LOWER(lf.app) = LOWER(t.app))))
    LEFT JOIN nwea_clean nwea ON ((lf.full_student_id = nwea.full_student_id) AND (LOWER(lf.subject) = nwea.subject_lower)))
-   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((lf.full_student_id = bh.full_student_id) AND (LOWER(lf.subject) = bh.subject) AND ((lf.lesson_date >= bh.valid_from_date) AND (lf.lesson_date < bh.valid_to_date))))
+   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((lf.full_student_id = bh.full_student_id) AND (LOWER(lf.subject) = bh.subject) AND ((lf.lesson_date >= bh.valid_from_date) AND (lf.lesson_date <= bh.valid_to_date))))
    LEFT JOIN studient.khiem_v_course_essential_totals cet ON ((LOWER(lf.app) = cet.app) AND (LOWER(lf.subject) = cet.subject) AND (lf.course = cet.course)))
    LEFT JOIN cumulative_agg cum ON ((lf.full_student_id = cum.student_id) AND (lf.lesson_date = cum.activity_date) AND (LOWER(lf.subject) = LOWER(cum.subject)) AND (LOWER(lf.app) = LOWER(cum.app)) AND (lf.lesson_rn = 1)))
    LEFT JOIN ixl_grade_lookup ixl ON ((LOWER(lf.app) = LOWER(ixl.app)) AND (LOWER(lf.subject) = LOWER(ixl.subject)) AND (TRY_CAST(lf.grade AS INTEGER) = ixl.numeric_grade)))
@@ -343,7 +369,7 @@ UNION ALL    SELECT
      (((((activity_unmatched au
    LEFT JOIN targets_map t ON ((au.full_student_id = t.full_student_id) AND (au.activity_date = t.date) AND (LOWER(au.subject) = LOWER(t.subject)) AND (LOWER(au.app) = LOWER(t.app))))
    LEFT JOIN nwea_clean nwea ON ((au.full_student_id = nwea.full_student_id) AND (LOWER(au.subject) = nwea.subject_lower)))
-   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((au.full_student_id = bh.full_student_id) AND (LOWER(au.subject) = bh.subject) AND ((au.activity_date >= bh.valid_from_date) AND (au.activity_date < bh.valid_to_date))))
+   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((au.full_student_id = bh.full_student_id) AND (LOWER(au.subject) = bh.subject) AND ((au.activity_date >= bh.valid_from_date) AND (au.activity_date <= bh.valid_to_date))))
    LEFT JOIN cumulative_agg cum ON ((au.full_student_id = cum.student_id) AND (au.activity_date = cum.activity_date) AND (LOWER(au.subject) = LOWER(cum.subject)) AND (LOWER(au.app) = LOWER(cum.app))))
    LEFT JOIN ixl_grade_lookup ixl_au ON ((LOWER(au.app) = LOWER(ixl_au.app)) AND (LOWER(au.subject) = LOWER(ixl_au.subject)) AND (TRY_CAST(au.grade AS INTEGER) = ixl_au.numeric_grade)))
 UNION ALL    SELECT
@@ -354,8 +380,8 @@ UNION ALL    SELECT
    , ts.student_name
    , r.campus_id
    , r.campus_name
-   , COALESCE(ast."group", r.campus_name) school_name
-   , ast."group" student_group
+   , COALESCE(ast.student_group, r.campus_name) school_name
+   , ast.student_group
    , r.grade
    , r.level
    , r.teacher_name
@@ -425,9 +451,9 @@ UNION ALL    SELECT
    FROM
      (((((studient.khiem_v_test_scores_final ts
    INNER JOIN studient.khiem_v_roster r ON (ts.student_id = r.full_student_id))
-   LEFT JOIN studient.alpha_student ast ON (ts.student_id = ast.fullid))
+   LEFT JOIN alpha_student_dedup ast ON (ts.student_id = ast.fullid))
    LEFT JOIN nwea_clean nwea ON ((r.full_student_id = nwea.full_student_id) AND (LOWER(trim(BOTH FROM ts.subject)) = nwea.subject_lower)))
-   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((r.full_student_id = bh.full_student_id) AND (LOWER(trim(BOTH FROM ts.subject)) = bh.subject) AND ((ts.date >= bh.valid_from_date) AND (ts.date < bh.valid_to_date))))
+   LEFT JOIN studient.khiem_v_bracketing_history_ranges bh ON ((r.full_student_id = bh.full_student_id) AND (LOWER(trim(BOTH FROM ts.subject)) = bh.subject) AND ((ts.date >= bh.valid_from_date) AND (ts.date <= bh.valid_to_date))))
    LEFT JOIN studient.edulastic_test_inventory ti ON (RTRIM(ts.test_name, '.') = ti.title))
    WHERE ((ts.date >= DATE '2025-01-01') AND (r.campus_id IN (SELECT campus_id
 FROM
@@ -445,8 +471,8 @@ UNION ALL    SELECT
    , r.student_name
    , r.campus_id
    , r.campus_name
-   , COALESCE(ast."group", r.campus_name) school_name
-   , ast."group" student_group
+   , COALESCE(ast.student_group, r.campus_name) school_name
+   , ast.student_group
    , r.grade
    , r.level
    , r.teacher_name
@@ -516,7 +542,7 @@ UNION ALL    SELECT
    FROM
      ((((studient.bracketing_assignments ba
    INNER JOIN studient.khiem_v_roster r ON (ba.full_student_id = r.full_student_id))
-   LEFT JOIN studient.alpha_student ast ON (r.full_student_id = ast.fullid))
+   LEFT JOIN alpha_student_dedup ast ON (r.full_student_id = ast.fullid))
    LEFT JOIN studient.edulastic_test_inventory ti ON (ba.test_key = ti.id))
    LEFT JOIN taken_tests tt ON ((ba.full_student_id = tt.student_id) AND (LOWER(trim(BOTH FROM ba.subject)) = tt.subject_lower) AND (tt.test_date >= CAST(from_iso8601_timestamp(ba.assigned_on) AS DATE))))
    WHERE ((ba.assigned_on IS NOT NULL) AND (trim(BOTH FROM ba.full_student_id) <> '') AND (r.campus_id IN (SELECT campus_id
@@ -524,7 +550,9 @@ FROM
   target_campuses
 )) AND (CAST(from_iso8601_timestamp(ba.assigned_on) AS DATE) >= DATE '2025-01-01'))
 ) 
-SELECT *
+SELECT deduped.*
+  , frp.first_placed AS first_placed_date
+  , CASE WHEN deduped.activity_date > frp.first_placed THEN TRUE ELSE FALSE END AS placed_before_activity
 FROM
   (
    SELECT
@@ -533,4 +561,6 @@ FROM
    FROM
      all_records ar
 )  deduped
+LEFT JOIN first_real_placement frp ON deduped.student_id = frp.full_student_id
+    AND LOWER(deduped.subject) = frp.subject
 WHERE (dedupe_rn = 1)
