@@ -190,9 +190,9 @@ See `diagrams/dependency_tree.md` for the complete tree.
 
 ### `khiem_v_roster`
 - **Source**: `alpha_student`
-- **Purpose**: Deduplicated student roster with campus and teacher info
-- **Key**: `full_student_id`
-- **Logic**: Joins `alpha_student` records, deduplicates by full_student_id
+- **Purpose**: Deduplicated student roster with campus and teacher info, filtered to enrolled students only
+- **Key**: `full_student_id` (guaranteed unique after dedup)
+- **Logic**: Two-step filter: (1) `unenrolled` CTE excludes any fullid that has a "Former Student" or "Mid-Year Unenrollment" row — this prevents ghost students whose most-recent status is unenrolled but have older Enrolled rows (24 students); (2) `ROW_NUMBER() OVER (PARTITION BY fullid ORDER BY group-populated DESC)` deduplicates remaining Enrolled rows, keeping `rn = 1`. The `group` column is the primary tiebreaker — rows with group populated are always the current roster entry (144/149 confirmed, 0 false positives). Pre-dedup, `alpha_student` has 755 duplicate fullid rows among 5,055 enrolled students.
 
 ### `khiem_v_daily_time`
 - **Source**: `daily_learning_metrics`
@@ -294,6 +294,8 @@ See the [Studient Excel Automation](https://github.com/khiemdoan-studient/studie
 | Issue | Root Cause | Fix |
 |-------|-----------|-----|
 | New students missing | Not in `alpha_student` table | Wait for SIS sync to S3 |
+| Duplicate rows in dashboard | `alpha_student` has multiple rows per fullid | Already handled by `khiem_v_roster` dedup (v1.1.0) |
+| Withdrawn student in data | Student not filtered by admission status | `khiem_v_roster` now filters to Enrolled only (v1.1.0) |
 | Campus not appearing | Campus ID not in `target_campuses` CTE | Add to hardcoded list in `khiem_v_lesson_unified` |
 | Test scores missing | Identity bridge can't resolve student | Check `khiem_identity_bridge` for the student UUID |
 | Knowledge grade wrong | Stale `bracketing_assignments` data | Check `valid_from_date` / `valid_to_date` ranges |

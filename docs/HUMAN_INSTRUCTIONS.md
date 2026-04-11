@@ -88,7 +88,7 @@ SHOW CREATE VIEW studient.khiem_v_lesson_unified;
 | Category | Views | Purpose |
 |----------|-------|---------|
 | **Primary Outputs** | `khiem_v_lesson_unified`, `khiem_v_weekly_dashboard`, `khiem_v_doom_loop_students` | Main analytics views |
-| **Student Identity** | `khiem_v_roster`, `khiem_identity_bridge` | Student dedup & enrichment |
+| **Student Identity** | `khiem_v_roster`, `khiem_identity_bridge` | Student dedup & enrichment (roster filters to Enrolled only) |
 | **Activity/Time** | `khiem_v_daily_time`, `khiem_v_lesson_activity`, `khiem_v_lesson_activity_full`, `khiem_v_lesson_detail`, `khiem_v_student_lessons` | Learning activity records |
 | **Tests** | `khiem_v_test_scores_final` | Unified test scores (3 sources) |
 | **Assessments** | `khiem_v_nwea_comprehensive` | NWEA/MAP scores |

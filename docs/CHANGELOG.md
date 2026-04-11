@@ -2,20 +2,45 @@
 
 All notable changes to the Studient Athena schema documentation.
 
-## [v1.1.0] — 2026-04-10
+## [v1.1.2] — 2026-04-08
 
-### Added
-- **`externalstudentid` column** — State/district student ID from upstream data feed
-  - Added to `alpha_student` external table DDL (3 new columns: `is_test`, `admission_date`, `externalstudentid`)
-  - Propagated through `khiem_v_roster` → `khiem_v_lesson_unified` → `khiem_v_weekly_dashboard`
-  - Available in all 4 UNION ALL branches of `khiem_v_lesson_unified` (Lesson, Activity, Test, Bracketing Assignment)
-- **Migration script** — `migration/001_add_externalstudentid.sql` with step-by-step Athena DDL commands
+### Fixed
+- **`khiem_v_roster` — Ghost student exclusion** — 24 students whose most-recent status was "Former Student" (21 at JRHS) or "Mid-Year Unenrollment" (3 others) were incorrectly appearing in the roster because older "Enrolled" rows passed the v1.1.0 filter. Fix: new `unenrolled` CTE excludes any `fullid` that has a "Former Student" or "Mid-Year Unenrollment" row before dedup runs. Verified: 0 re-enrolled students exist in the data, so this exclusion is safe.
+
+## [v1.1.1] — 2026-04-07
+
+### Fixed
+- **`khiem_v_lesson_unified` — alpha_student dedup** — All 4 `LEFT JOIN studient.alpha_student ast` replaced with `LEFT JOIN alpha_student_dedup ast` (new CTE with same ROW_NUMBER dedup logic as roster). Eliminates row multiplication in Lesson, Activity, Test, and Bracketing Assignment branches. Column `ast."group"` aliased to `ast.student_group` to avoid SQL reserved word issues in Athena.
+- **`khiem_v_weekly_dashboard` — alpha_student dedup** — Same `alpha_student_dedup` CTE added. The `sc_roster` CTE's `LEFT JOIN alpha_student` replaced with deduped version. Fixes WPD Student Breakdown showing double rows per student (one with group, one without).
+- **Impact**: `_Data` sheet reduced from 71,360 to 66,592 rows (4,768 duplicate student-week entries eliminated across all campuses).
+
+## [v1.1.0] — 2026-04-06
 
 ### Changed
-- `ddl/tables/alpha_student.sql` — 24 → 27 columns (matches upstream `dash-data.alpha_student` on RAPIDAPI account)
-- `ddl/views/khiem_v_roster.sql` — added `externalstudentid` output column
-- `ddl/views/khiem_v_lesson_unified.sql` — added `externalstudentid` to all row types
-- `ddl/views/khiem_v_weekly_dashboard.sql` — added `externalstudentid` to `sc_roster` CTE and final output
+- **`khiem_v_roster` — Dedup + Enrolled filter** — The view now deduplicates `alpha_student` rows using `ROW_NUMBER() OVER (PARTITION BY fullid)` with the `group` column as the primary tiebreaker, and filters to `admissionstatus = 'Enrolled'` only. Previously, the view was a plain `SELECT` from `alpha_student` with no dedup or status filter, producing 755 duplicate rows out of 5,055 enrolled students. This caused row multiplication in downstream `CROSS JOIN` views like `khiem_v_weekly_dashboard`.
+
+### Analysis Summary
+- 5,055 unique enrolled students in `alpha_student`
+- 606 exact duplicates (identical advisor + group) — handled by any dedup
+- 109 group-only changes — first row in file always has group populated (109/109)
+- 34 advisor + group changes — first row has group (34/34)
+- 6 advisor-only changes — 5 with no group on any row (fall to tiebreaker), 1 with consistent group
+- 0 false positives (old row has group, current doesn't)
+
+### Downstream Impact
+| View | Impact |
+|------|--------|
+| `khiem_v_weekly_dashboard` | FIXED — eliminates duplicate rows from roster CROSS JOIN weeks |
+| `khiem_v_lesson_unified` | FIXED — existing `roster_dedup` ROW_NUMBER becomes redundant (harmless) |
+| `khiem_v_doom_loop_students` | FIXED — inherits clean data from lesson_unified |
+| `khiem_v_daily_targets` | FIXED — 1:1 join on full_student_id |
+| `khiem_v_student_essential_mastery_from_lm` | FIXED — manual roster dedup CTE becomes redundant |
+| `khiem_v_lesson_detail` | FIXED — join on external_student_id now 1:1 |
+| `khiem_v_student_activity_flat` | FIXED — join on full_student_id now 1:1 |
+| `khiem_v_rls_teacher_students` | FIXED — DISTINCT becomes redundant |
+| `khiem_v_lesson_activity_full` | FIXED — DISTINCT becomes redundant |
+| `khiem_identity_bridge` | NOT AFFECTED — joins alpha_student directly (separate fix needed) |
+| `khiem_v_test_scores_final` | NOT AFFECTED — joins alpha_student directly (separate fix needed) |
 
 ---
 

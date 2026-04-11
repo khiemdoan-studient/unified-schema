@@ -157,16 +157,21 @@ The central unified view. Combines 4 record types via UNION ALL.
 
 ### `khiem_v_roster`
 
+Deduplicated to 1 row per `full_student_id`. Filtered to `admissionstatus = 'Enrolled'` only. Uses `ROW_NUMBER` with `group`-populated preference as tiebreaker.
+
 | Column | Type | Description |
 |--------|------|-------------|
-| `full_student_id` | VARCHAR | Full student ID (PK) |
+| `full_student_id` | VARCHAR | Full student ID (PK, unique after dedup) |
+| `campus_id` | VARCHAR | 3-digit campus code |
 | `external_student_id` | VARCHAR | Short student ID |
-| `campus_id` | VARCHAR | Campus ID |
-| `campus_name` | VARCHAR | Campus name |
 | `student_name` | VARCHAR | Student full name |
 | `grade` | VARCHAR | Grade level |
+| `age_grade` | VARCHAR | Alpha level short |
 | `level` | VARCHAR | School level |
-| `teacher_name` | VARCHAR | Teacher name |
+| `teacher_name` | VARCHAR | Teacher/advisor name |
+| `campus_name` | VARCHAR | Campus name |
+| `status` | VARCHAR | Admission status (always 'Enrolled') |
+| `student_email` | VARCHAR | Student email |
 | `teacher_email` | VARCHAR | Teacher email |
 
 ### `khiem_v_daily_time`
