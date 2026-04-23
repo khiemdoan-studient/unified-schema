@@ -79,7 +79,21 @@ WITH
    , lm.resource_type
    , lm.status
    , (CASE WHEN (LOWER(COALESCE(lm.resource_type, '')) = 'essential') THEN 1 ELSE 0 END) is_essential
-   , (CASE WHEN (LOWER(COALESCE(lm.status, '')) IN ('completed', 'mastered', 'passed')) THEN 1 ELSE 0 END) is_mastered
+   , (CASE
+        WHEN (LOWER(COALESCE(lm.status, '')) IN ('completed', 'mastered', 'passed')) THEN 1
+        -- v3.28.0 (2026-04-23): Accuracy-based fallback for apps that don't populate `status`.
+        -- Lalilo, Duolingo, AlphaWrite, etc. never set status='completed' even when the student
+        -- mastered the activity. Without this fallback ~17,600 student-lesson rows/month are
+        -- silently dropped. Rule: if status is null/empty AND >=3 questions attempted AND >=80%
+        -- correct → count as mastered. The 3-question floor prevents 1/1 or 2/2 lucky guesses.
+        -- Audit: SELECT app, COUNT(*) ... FROM level_mastery WHERE status IS NULL GROUP BY app.
+        WHEN (lm.status IS NULL OR lm.status = '')
+             AND COALESCE(TRY_CAST(lm.activity_units_attempted AS INTEGER), 0) >= 3
+             AND CAST(COALESCE(TRY_CAST(lm.activity_units_correct AS INTEGER), 0) AS DOUBLE)
+                 / NULLIF(COALESCE(TRY_CAST(lm.activity_units_attempted AS INTEGER), 0), 0) >= 0.80
+        THEN 1
+        ELSE 0
+     END) is_mastered
    , ROW_NUMBER() OVER (PARTITION BY lm.date, lm.external_student_id, lm.subject, lm.app ORDER BY lm.mastered_at ASC NULLS LAST, lm.id ASC) lesson_rn
    FROM
      studient.level_mastery lm
@@ -99,6 +113,7 @@ WITH
    , r.teacher_email
    , ast.advisoremail advisor_email
    , r.student_name
+   , r.externalstudentid
    , ROW_NUMBER() OVER (PARTITION BY lb.lesson_id ORDER BY r.campus_id ASC) roster_dedup
    FROM
      ((lesson_base lb
@@ -143,6 +158,7 @@ FROM
    , r.teacher_name
    , r.teacher_email
    , ast.advisoremail advisor_email
+   , r.externalstudentid
    FROM
      (((studient.khiem_v_daily_time dt
    INNER JOIN studient.khiem_v_roster r ON (dt.full_student_id = r.full_student_id))
@@ -278,6 +294,7 @@ FROM
    , CAST(null AS INTEGER) days_since_assignment
    , CAST(null AS BOOLEAN) is_active_assignment
    , bh.notes
+   , lf.externalstudentid
    FROM
      (((((((((lesson_final lf
    LEFT JOIN targets_map t ON ((lf.full_student_id = t.full_student_id) AND (lf.lesson_date = t.date) AND (LOWER(lf.subject) = LOWER(t.subject)) AND (LOWER(lf.app) = LOWER(t.app))))
@@ -365,6 +382,7 @@ UNION ALL    SELECT
    , CAST(null AS INTEGER) days_since_assignment
    , CAST(null AS BOOLEAN) is_active_assignment
    , CAST(null AS VARCHAR) notes
+   , au.externalstudentid
    FROM
      (((((activity_unmatched au
    LEFT JOIN targets_map t ON ((au.full_student_id = t.full_student_id) AND (au.activity_date = t.date) AND (LOWER(au.subject) = LOWER(t.subject)) AND (LOWER(au.app) = LOWER(t.app))))
@@ -448,6 +466,7 @@ UNION ALL    SELECT
    , CAST(null AS INTEGER) days_since_assignment
    , CAST(null AS BOOLEAN) is_active_assignment
    , bh.notes
+   , r.externalstudentid
    FROM
      (((((studient.khiem_v_test_scores_final ts
    INNER JOIN studient.khiem_v_roster r ON (ts.student_id = r.full_student_id))
@@ -539,6 +558,7 @@ UNION ALL    SELECT
    , DATE_DIFF('day', CAST(from_iso8601_timestamp(ba.assigned_on) AS DATE), current_date) days_since_assignment
    , (CASE WHEN (((ba.invalidated_on IS NULL) OR (trim(BOTH FROM ba.invalidated_on) = '')) AND (tt.test_date IS NULL)) THEN true ELSE false END) is_active_assignment
    , ba.notes notes
+   , r.externalstudentid
    FROM
      ((((studient.bracketing_assignments ba
    INNER JOIN studient.khiem_v_roster r ON (ba.full_student_id = r.full_student_id))

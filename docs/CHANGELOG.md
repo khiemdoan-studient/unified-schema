@@ -2,6 +2,45 @@
 
 All notable changes to the Studient Athena schema documentation.
 
+## [v1.2.0] — 2026-04-23
+
+### Changed — `khiem_v_lesson_unified` — accuracy-based completion fallback for apps with null `status`
+
+Apps like Lalilo, Duolingo, AlphaWrite, TeachTales, Athena, Amira, and eGumpp never populate `level_mastery.status`, so the existing rule `is_mastered = 1 WHEN status IN ('completed','mastered','passed')` was always 0 for them — even when the student clearly mastered the activity (e.g., Lalilo has 87.9% global accuracy per the Timeback Reporting Connector).
+
+**New rule in `lesson_base` CTE (line ~82)**:
+
+```sql
+is_mastered = CASE
+  WHEN LOWER(status) IN ('completed','mastered','passed') THEN 1
+  WHEN (status IS NULL OR status = '')
+       AND activity_units_attempted >= 3
+       AND activity_units_correct / activity_units_attempted >= 0.80 THEN 1
+  ELSE 0
+END
+```
+
+The 3-question floor prevents 1/1 lucky guesses. Previously-working apps (IXL, Alpha Reading, Khan Academy) are unaffected — they populate `status` so they hit the first branch.
+
+**Audit (level_mastery, April 2026, all schools)**:
+
+| App | Total rows | Mastered before | Mastered after | Gained |
+|---|---|---|---|---|
+| Lalilo | 12,621 | 0 | 8,563 | **+8,563** |
+| AlphaWrite | 8,152 | 229 | 5,563 | **+5,334** |
+| Duolingo | 11,218 | 0 | 3,735 | **+3,735** |
+| Amira | 25 | 0 | 21 | +21 |
+| Khan Academy | 7,581 | 3,089 | 3,105 | +16 |
+| IXL | 61,737 | 42,318 | 42,318 | 0 (unchanged) |
+
+**Scope impact** (11 Studient campuses, Apr 15-22 window): Lalilo 0 → 235 lessons_mastered. Duolingo/AlphaWrite have no students at Studient campuses this window; rule still applied for future-proofing.
+
+**Downstream**: `khiem_v_weekly_dashboard.lessons_mastered`, which aggregates `is_mastered` via `SUM(COALESCE(levels_mastered, 0))`, now reflects these recovered lessons. No schema change needed.
+
+### Related
+
+Paired with Studient pipeline v3.28.0 (see `../Studient Excel Automation/docs/CHANGELOG.md`) which adds a parallel Math Academy integration via the Timeback Reporting Connector (BigQuery snapshot pattern). The view fix and the connector snapshot are independent — the view fix works immediately, the MA data arrives once the GitHub Action workflow is activated.
+
 ## [v1.1.2] — 2026-04-08
 
 ### Fixed
