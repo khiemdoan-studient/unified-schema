@@ -1,7 +1,16 @@
 -- VIEW: studient.khiem_v_test_scores_final
 -- Extracted from AWS Athena on 2026-03-29
+-- Updated 2026-04-13: Fixed test dedup partition. Previously included accuracy_pct
+--                      in PARTITION BY, causing same-test-same-day-different-score
+--                      duplicates (e.g., 60% + 75% attempts of "Alpha 2024 Language 2.4")
+--                      to count as 2 separate tests. This inflated tests_taken in
+--                      khiem_v_weekly_dashboard and all downstream views. Fix:
+--                      (1) removed accuracy_pct from partition, (2) changed ORDER BY
+--                      to score DESC NULLS LAST, accuracy_pct DESC, test_id ASC so
+--                      highest-score variant wins (matches QuickSight behavior).
+--                      Affected: 109 duplicate cases, 98 students, 127 extra test rows.
 
-CREATE VIEW studient.khiem_v_test_scores_final AS
+CREATE OR REPLACE VIEW studient.khiem_v_test_scores_final AS
 WITH
   roster_lookup AS (
    SELECT
@@ -12,7 +21,7 @@ WITH
    , LPAD(CAST(campusid AS VARCHAR), 3, '0') campus_id
    FROM
      studient.alpha_student
-) 
+)
 , raw_tests AS (
    SELECT
      assignmentid test_id
@@ -92,7 +101,7 @@ UNION ALL       SELECT
         studient.khiem_v_nwea_comprehensive
       WHERE (spring_rit IS NOT NULL)
    )  nwea_tests
-) 
+)
 , joined_tests AS (
    SELECT
      t.date
@@ -108,7 +117,17 @@ UNION ALL       SELECT
    , (CASE WHEN (t.test_type = 'MAP') THEN (CASE WHEN (t.score >= 50) THEN 'On Track' ELSE 'Off Track' END) WHEN ((CASE WHEN (t.accuracy_raw <= 1) THEN (t.accuracy_raw * 100) ELSE t.accuracy_raw END) >= 8.95E1) THEN 'Pass' ELSE 'Fail' END) pass_fail
    , t.test_id
    , t.duration_minutes
-   , ROW_NUMBER() OVER (PARTITION BY COALESCE(r_fullid.fullid, r_id.fullid, r_email.fullid, ib_extid.fullid, ib_email.fullid, ib_roster.fullid, t.source_student_id), t.date, RTRIM(t.test_name, '.'), t.source_system, ROUND((CASE WHEN (t.accuracy_raw <= 1) THEN (t.accuracy_raw * 100) ELSE t.accuracy_raw END), 4) ORDER BY t.test_id ASC) dedup_rn
+   , ROW_NUMBER() OVER (
+       PARTITION BY 
+         COALESCE(r_fullid.fullid, r_id.fullid, r_email.fullid, ib_extid.fullid, ib_email.fullid, ib_roster.fullid, t.source_student_id),
+         t.date,
+         RTRIM(t.test_name, '.'),
+         t.source_system
+       ORDER BY 
+         t.score DESC NULLS LAST,
+         (CASE WHEN (t.accuracy_raw <= 1) THEN (t.accuracy_raw * 100) ELSE t.accuracy_raw END) DESC NULLS LAST,
+         t.test_id ASC
+     ) dedup_rn
    FROM
      ((((((raw_tests t
    LEFT JOIN roster_lookup r_fullid ON (t.source_student_id = r_fullid.fullid))
@@ -118,7 +137,7 @@ UNION ALL       SELECT
    LEFT JOIN studient.khiem_identity_bridge ib_email ON ((ib_email.bridge_type = 'EMAIL') AND (COALESCE(t.source_email, LOWER(trim(BOTH FROM t.source_student_id))) = ib_email.email_norm)))
    LEFT JOIN studient.khiem_identity_bridge ib_roster ON ((ib_roster.bridge_type = 'ROSTER') AND (t.source_student_id = ib_roster.fullid)))
    WHERE (t.date >= DATE '2025-01-01')
-) 
+)
 SELECT
   date
 , student_id

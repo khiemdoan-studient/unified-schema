@@ -2,6 +2,39 @@
 
 All notable changes to the Studient Athena schema documentation.
 
+## [v1.2.1] — 2026-04-13
+
+### Fixed — `khiem_v_test_scores_final` — test dedup collapsing duplicate score rows
+
+**Root cause:** The `ROW_NUMBER()` dedup in `joined_tests` CTE included `ROUND(accuracy_pct, 4)` in the `PARTITION BY` clause. When Edulastic exported the same test twice with different accuracy scores (e.g., partial completion at 60% + full completion at 75%), both rows passed dedup with `dedup_rn = 1`, inflating downstream test counts.
+
+**Example — Genesis Fuentes Cruz (084-12950) week of 2026-04-20:**
+- Before: 2 test rows for "Alpha 2024 Language 2.4" on 2026-04-21 (scores 12.0/60% and 15.0/75%, both Fail)
+- After: 1 test row with score=15.0, accuracy=75% (highest score wins, matches QuickSight)
+- Weekly dashboard `tests_taken` for her week: 2 → 1 ✓
+
+**Fix:** In the `joined_tests` CTE:
+1. Removed `ROUND(accuracy_pct, 4)` from the `PARTITION BY` clause
+2. Changed `ORDER BY t.test_id ASC` to:
+   ```sql
+   ORDER BY t.score DESC NULLS LAST,
+            (CASE WHEN t.accuracy_raw <= 1 THEN t.accuracy_raw * 100 ELSE t.accuracy_raw END) DESC NULLS LAST,
+            t.test_id ASC
+   ```
+
+**Scope (YTD 2026):**
+- 109 duplicate cases resolved
+- 98 students affected
+- 127 extra test rows eliminated across downstream views
+
+**Downstream impact:** All views that consume `khiem_v_test_scores_final` now see correct test counts:
+- `khiem_v_lesson_unified` (Test branch)
+- `khiem_v_weekly_dashboard` (tests_taken, tests_mastered)
+- `khiem_v_student_activity_flat`
+- `khiem_v_doom_loop_students` (indirect, via lesson_unified)
+
+No DDL changes needed in consumers — the fix is transparent.
+
 ## [v1.2.0] — 2026-04-23
 
 ### Changed — `khiem_v_lesson_unified` — accuracy-based completion fallback for apps with null `status`

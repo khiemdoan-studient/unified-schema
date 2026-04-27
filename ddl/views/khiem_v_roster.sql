@@ -32,6 +32,7 @@ ranked AS (
   , s.admissionstatus status
   , s.email student_email
   , s.advisoremail teacher_email
+  , s.externalstudentid
   , ROW_NUMBER() OVER (
       PARTITION BY s.fullid
       ORDER BY
@@ -45,6 +46,6 @@ ranked AS (
 SELECT
   full_student_id, campus_id, external_student_id, student_name,
   grade, age_grade, level, teacher_name, campus_name, status,
-  student_email, teacher_email
+  student_email, teacher_email, externalstudentid
 FROM ranked
 WHERE rn = 1

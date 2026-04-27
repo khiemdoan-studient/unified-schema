@@ -301,3 +301,12 @@ See the [Studient Excel Automation](https://github.com/khiemdoan-studient/studie
 | Knowledge grade wrong | Stale `bracketing_assignments` data | Check `valid_from_date` / `valid_to_date` ranges |
 | Weekly dashboard shows 0s | Student has no `khiem_v_lesson_unified` rows | Check if student has `level_mastery` records |
 | NWEA scores null | Student not in `nwea_reports` | Wait for MAP data load |
+| Target % is 0% everywhere | `essential_units_mastered` is mostly 0 | Dashboard uses `lessons_mastered` (all completed skills), not essentials. The `mastery_thresholds` targets measure all skills at 100 SmartScore, not just essential-tagged ones |
+| Daily target is NULL | Student's app/subject/grade has no `mastery_thresholds` entry | Check `mastery_thresholds` table for the combination |
+
+## Context Management
+
+- Compact after finishing research/exploration, before starting implementation
+- Compact after completing a major task before starting the next
+- Compact after debugging before continuing feature work
+- For subagents: use Sonnet (default) for file search and exploration. Escalate to Opus (`model: "opus"`) for complex SQL analysis, multi-view dependency tracing, or architectural decisions
